@@ -1,0 +1,7 @@
+# Channel id used for reaction roles
+REACTION ROLE CHANNEL: "846958356060176384"
+
+# Role Ids and emotes used for reactions
+ROLE REACTIONS:
+  "846958955397382144": "♂️"
+  "846958995994574868": "♀️"

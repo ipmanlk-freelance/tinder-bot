@@ -1,0 +1,24 @@
+# This is your discord bot token from https://discord.com/developers/applications
+TOKEN: "ODExMjk5NjI2MjUwMjcyNzg4.YCwLqA.f2W4oA0Li37_MJdCWfRzkxCeDGA"
+
+# This is the activity type of bot (status) and can be one of the following,
+#   PLAYING
+#   STREAMING
+#   LISTENING
+#   WATCHING
+#   CUSTOM_STATUS
+#   COMPETING
+ACTIVITY TYPE: "PLAYING"
+
+# This is the name of the activity that can be seen right next to activity type.
+# You can use any text you want here.
+ACTIVITY NAME: "Just chilling"
+
+# Online, offline and other states bot can have. This can be one of the following,
+#   online
+#   idle
+#   dnd
+STATUS: "online"
+
+# Prefix the bot commands listen to. All bot commands should start with this
+PREFIX: "!"
