@@ -89,7 +89,7 @@ export const handle = async (msg: Message) => {
 		.setChannel(dm.channel)
 		.setColor(0x2d91e7)
 		.setFooter("Please goto #match channel to start a chat with this person.")
-		.setPageIndicator(true)
+		.setPageIndicator(false)
 		.build();
 
 	msg.delete({ timeout: 5000 }).catch((e) => {});
