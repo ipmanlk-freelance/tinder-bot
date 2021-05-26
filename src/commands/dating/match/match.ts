@@ -4,10 +4,10 @@ import {
 	Message,
 	MessageReaction,
 	ReactionEmoji,
+	TextChannel,
 	User,
 } from "discord.js";
-import { userInfo } from "node:os";
-import { saveMatch } from "../../../data";
+import { getMatches, saveMatch } from "../../../data";
 import { getBotConfig } from "../../../util/config";
 import { parseYAML } from "../../../util/parse";
 
@@ -40,6 +40,37 @@ export const handle = async (msg: Message) => {
 	if (mentionedMember.id == author.id) {
 		sendErrorDM(author, "You can't match yourself.");
 		deleteMsgIfPossible(msg);
+		return;
+	}
+
+	// check if these two already have a match open
+	const matches = await getMatches(author.id, mentionedMember.id);
+
+	if (matches.isErr()) {
+		console.log("Unable to access the database.");
+		return;
+	}
+
+	if (matches.value.length != 0) {
+		deleteMsgIfPossible(msg);
+
+		sendErrorDM(
+			author,
+			`You already have a private chat open with **${
+				mentionedMember.nickname || mentionedMember.user.username
+			}**.`
+		);
+
+		const dChannel = guild.channels.cache.get(matches.value[0].channelId);
+
+		if (!dChannel) return;
+
+		const datingChannel = dChannel as TextChannel;
+
+		datingChannel.send(
+			`**<@${author.id}> <@${mentionedMember.id}>, Please close this private chat first with _${botConfig.PREFIX}done_ command before opening an another.**`
+		);
+
 		return;
 	}
 
@@ -436,7 +467,7 @@ const createMatch = async (
 	// create a new channel
 	const channelName = `match-${categoryChannel.children.size + 1}`;
 
-	const datingChanenl = await guild.channels
+	const datingChannel = await guild.channels
 		.create(channelName, {
 			type: "text",
 			permissionOverwrites: [
@@ -452,10 +483,10 @@ const createMatch = async (
 			);
 		});
 
-	if (!datingChanenl) return;
+	if (!datingChannel) return;
 
 	const res = await saveMatch(
-		datingChanenl.id,
+		datingChannel.id,
 		authorInfo.user.id,
 		matchInfo.user.id
 	);
@@ -465,7 +496,7 @@ const createMatch = async (
 		return;
 	}
 
-	datingChanenl.send(`<@${authorInfo.user.id}> <@${matchInfo.user.id}>,`, {
+	datingChannel.send(`<@${authorInfo.user.id}> <@${matchInfo.user.id}>,`, {
 		embed: {
 			title: "Private dating channel created.",
 			color: 0xff007f,

@@ -32,13 +32,14 @@ export const saveMatch = async (
 };
 
 export const getMatches = async (
-	memberId: string
+	authorId: string,
+	matchId: string
 ): Promise<Result<Array<any>, DBError>> => {
 	const db = await getConnection();
 
 	const records = await db.all(
-		"SELECT * FROM matches WHERE authorId = ? OR matchId = ?",
-		[memberId, memberId]
+		"SELECT * FROM matches WHERE authorId = ? AND matchId = ? OR matchId = ? AND authorId = ?",
+		[authorId, matchId, authorId, matchId]
 	);
 
 	try {
