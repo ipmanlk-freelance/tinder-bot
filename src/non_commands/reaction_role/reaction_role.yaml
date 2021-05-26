@@ -5,3 +5,8 @@ REACTION ROLE CHANNEL: "846958356060176384"
 ROLE REACTIONS:
   "846958955397382144": "♂️"
   "846958995994574868": "♀️"
+
+# Role names associated with each role. These roles should be same as above, but order doesn't matter.
+ROLE NAMES: 
+  "846958955397382144": "Male"
+  "846958995994574868": "Female"
