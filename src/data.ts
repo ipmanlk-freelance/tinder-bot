@@ -52,6 +52,39 @@ export const getMatches = async (
 	}
 };
 
+export const getMatch = async (channelId: string) => {
+	const db = await getConnection();
+
+	const record = await db.get("SELECT * FROM matches WHERE channelId = ?", [
+		channelId,
+	]);
+
+	try {
+		return ok(record);
+	} catch (e) {
+		return err({
+			code: "INTERNAL",
+			error: e,
+		});
+	}
+};
+
+export const deleteMatch = async (
+	channelId: string
+): Promise<Result<true, DBError>> => {
+	const db = await getConnection();
+
+	try {
+		await db.run("DELETE FROM matches WHERE channelId = ?", [channelId]);
+		return ok(true);
+	} catch (e) {
+		return err({
+			code: "INTERNAL",
+			error: e,
+		});
+	}
+};
+
 const getConnection = async () => {
 	try {
 		if (connection) {
