@@ -3,6 +3,7 @@ import { getCommands } from "./command_loader";
 import { parseYAML } from "./util/parse";
 import { checkMemberHasPermission } from "./util/permissions";
 import { reactionRole } from "./non_commands/reaction_role/reaction_role";
+import { deleteMatch } from "./data";
 const config = parseYAML(`${__dirname}/../setup/config.yaml`);
 process.env.BOT = config;
 
@@ -55,6 +56,10 @@ client.on("message", async (msg) => {
 	} catch (e) {
 		console.log(e);
 	}
+});
+
+client.on("channelDelete", (channel) => {
+	deleteMatch(channel.id);
 });
 
 client.login(config.TOKEN);
