@@ -5,3 +5,6 @@ ALLOWED ROLES: ["PUBLIC"]
 
 # Channel ID used to run the match command in
 MATCH CHANNEL: "846982184611217429"
+
+# Category id used to create dating channels
+DATING CATEGORY: "846958409697722409"

@@ -1,17 +1,35 @@
-import { Message, MessageReaction, ReactionEmoji, User } from "discord.js";
+import {
+	CategoryChannel,
+	Guild,
+	Message,
+	MessageReaction,
+	ReactionEmoji,
+	User,
+} from "discord.js";
+import { userInfo } from "node:os";
+import { saveMatch } from "../../../data";
 import { getBotConfig } from "../../../util/config";
 import { parseYAML } from "../../../util/parse";
 
 const botConfig: any = getBotConfig();
 const cmdConfig: any = parseYAML(`${__dirname}/match.yaml`);
 
+interface UserInfo {
+	user: User;
+	age: number;
+	location: string;
+}
+
 export const handle = async (msg: Message) => {
 	if (cmdConfig["MATCH CHANNEL"] !== msg.channel.id) {
 		return;
 	}
 
+	const guild = msg.guild;
 	const author = msg.author;
 	const mentionedMember = msg.mentions.members?.first();
+
+	if (!guild) return;
 
 	if (!mentionedMember) {
 		sendErrorDM(author, "Please mention a member to match.");
@@ -188,6 +206,22 @@ export const handle = async (msg: Message) => {
 				msg.member?.nickname || author.username
 			}** has confirmed the private chat invitation.`
 		);
+
+		const authorInfo: UserInfo = {
+			user: author,
+			age: authorAge,
+			location: authorLocation,
+		};
+
+		const matchInfo: UserInfo = {
+			user: mentionedMember.user,
+			age: matchAge,
+			location: matchLocation,
+		};
+
+		createMatch(guild, authorInfo, matchInfo).catch((e) => {
+			console.log(e);
+		});
 	} else {
 		sendDualResponse(
 			author,
@@ -380,4 +414,67 @@ const deleteMsgIfPossible = (msg: Message) => {
 		msg.react("✅");
 		msg.delete({ timeout: 5000 });
 	}
+};
+
+// create channel and assign permissions
+const createMatch = async (
+	guild: Guild,
+	authorInfo: UserInfo,
+	matchInfo: UserInfo
+) => {
+	// find category
+	const category = guild.channels.cache.get(cmdConfig["DATING CATEGORY"]);
+
+	if (!category || category.type != "category") {
+		console.log(
+			"Failed to locate the dating category channel. Please check your configuration."
+		);
+		return;
+	}
+	const categoryChannel = category as CategoryChannel;
+
+	// create a new channel
+	const channelName = `match-${categoryChannel.children.size + 1}`;
+
+	const datingChanenl = await guild.channels
+		.create(channelName, {
+			type: "text",
+			permissionOverwrites: [
+				{ id: guild.roles.everyone, deny: "VIEW_CHANNEL" },
+				{ id: authorInfo.user, allow: "VIEW_CHANNEL" },
+				{ id: matchInfo.user, allow: "VIEW_CHANNEL" },
+			],
+			parent: categoryChannel,
+		})
+		.catch((e) => {
+			console.log(
+				"Failed to create a dating channel. Please check your bot permissions and configuration."
+			);
+		});
+
+	if (!datingChanenl) return;
+
+	const res = await saveMatch(
+		datingChanenl.id,
+		authorInfo.user.id,
+		matchInfo.user.id
+	);
+
+	if (res.isErr()) {
+		console.log(res.error);
+		return;
+	}
+
+	datingChanenl.send(`<@${authorInfo.user.id}> <@${matchInfo.user.id}>,`, {
+		embed: {
+			title: "Private dating channel created.",
+			color: 0xff007f,
+			description: `**Participants,**
+			<@${authorInfo.user.id}> | Age: ${authorInfo.age} | Location: ${authorInfo.location}
+			<@${matchInfo.user.id}> | Age: ${matchInfo.age} | Location: ${matchInfo.location}`,
+			footer: {
+				text: `Please use ${botConfig.PREFIX}done command to close this private chat.`,
+			},
+		},
+	});
 };
