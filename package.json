@@ -1,5 +1,5 @@
 {
-  "name": "discordjs-typescript-bot-starter",
+  "name": "tinder-bot",
   "version": "1.0.0",
   "description": "",
   "scripts": {
@@ -11,10 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@discordjs/opus": "^0.5.0",
-    "discord-player": "^4.1.0",
     "discord.js": "^12.5.3",
-    "discordjs-reaction-role": "^1.0.0",
     "neverthrow": "^4.2.1",
     "sqlite": "^4.0.23",
     "sqlite3": "^5.0.2",

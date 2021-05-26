@@ -1,0 +1,8 @@
+# Specify role ids you want to have access to this command.
+# If all admins are allowed, you can use ADMIN.
+# if anyone can run this command, you can use PUBLIC.
+ALLOWED ROLES: ["PUBLIC"]
+
+# Channel ID used to run the swipe command in
+SWIPE CHANNEL: "846982184611217429"
+
