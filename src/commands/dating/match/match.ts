@@ -1,18 +1,19 @@
 import {
 	CategoryChannel,
 	Guild,
+	GuildMember,
 	Message,
 	MessageReaction,
-	ReactionEmoji,
 	TextChannel,
 	User,
 } from "discord.js";
 import { getMatches, saveMatch } from "../../../data";
-import { getBotConfig } from "../../../util/config";
+import { getBotConfig, getReactionRoleConfig } from "../../../util/config";
 import { parseYAML } from "../../../util/parse";
 
 const botConfig: any = getBotConfig();
 const cmdConfig: any = parseYAML(`${__dirname}/match.yaml`);
+const reactionRoleConfig: any = getReactionRoleConfig();
 
 interface UserInfo {
 	user: User;
@@ -27,37 +28,38 @@ export const handle = async (msg: Message) => {
 
 	const guild = msg.guild;
 	const author = msg.author;
-	const mentionedMember = msg.mentions.members?.first();
+	const authorMember = msg.member;
+	const matchMember = msg.mentions.members?.first();
 
-	if (!guild) return;
+	if (!guild || !authorMember) return;
 
-	if (!mentionedMember) {
+	if (!matchMember) {
 		sendErrorDM(author, "Please mention a member to match.");
 		deleteMsgIfPossible(msg);
 		return;
 	}
 
-	if (mentionedMember.id == author.id) {
+	if (matchMember.id == author.id) {
 		sendErrorDM(author, "You can't match yourself.");
 		deleteMsgIfPossible(msg);
 		return;
 	}
 
 	// check if these two already have a match open
-	const matches = await getMatches(author.id, mentionedMember.id);
+	const matches = await getMatches(author.id, matchMember.id);
 
 	if (matches.isErr()) {
 		console.log("Unable to access the database.");
+		deleteMsgIfPossible(msg);
 		return;
 	}
 
 	if (matches.value.length != 0) {
 		deleteMsgIfPossible(msg);
-
 		sendErrorDM(
 			author,
 			`You already have a private chat open with **${
-				mentionedMember.nickname || mentionedMember.user.username
+				matchMember.nickname || matchMember.user.username
 			}**.`
 		);
 
@@ -68,12 +70,36 @@ export const handle = async (msg: Message) => {
 		const datingChannel = dChannel as TextChannel;
 
 		datingChannel.send(
-			`**<@${author.id}> <@${mentionedMember.id}>, Please close this private chat first with _${botConfig.PREFIX}done_ command before opening an another.**`
+			`**<@${author.id}> <@${matchMember.id}>, Please close this private chat first with _${botConfig.PREFIX}done_ command before opening an another.**`
 		);
 
 		return;
 	}
 
+	// figure out gender of both author and match
+	const authorGender = getGender(authorMember);
+	const matchGender = getGender(matchMember);
+
+	if (authorGender.trim() == "") {
+		sendErrorDM(author, "Please add a gender role before starting a match.");
+		deleteMsgIfPossible(msg);
+		return;
+	}
+
+	if (matchGender.trim() == "") {
+		sendErrorDM(
+			author,
+			`Your match **${
+				matchMember.nickname || matchMember.user.username
+			}** doesn't have a gender role. Please ask that person to add one first.`
+		);
+		deleteMsgIfPossible(msg);
+		return;
+	}
+
+	deleteMsgIfPossible(msg);
+
+	// start getting author information
 	let authorAge, authorLocation;
 
 	try {
@@ -103,13 +129,14 @@ export const handle = async (msg: Message) => {
 	await sendSuccessDM(author, `Please be patient until your match responds.`);
 
 	// invite to the matched user
-	const inviteMsg = await mentionedMember.send({
+	const inviteMsg = await matchMember.send({
 		embed: {
 			color: 0xff007f,
 			description: `Member **${
 				msg.member?.nickname || msg.member?.user.username
 			}** would like to start a private conversation with you.\n\nMember Formation,`,
 			fields: [
+				{ name: "Gender", value: authorGender },
 				{ name: "Age", value: authorAge },
 				{ name: "Location", value: authorLocation },
 			],
@@ -125,7 +152,7 @@ export const handle = async (msg: Message) => {
 	const filter = (reaction: MessageReaction, user: User) => {
 		return (
 			["👍", "👎"].includes(reaction.emoji.name) &&
-			user.id === mentionedMember.user.id
+			user.id === matchMember.user.id
 		);
 	};
 
@@ -140,9 +167,9 @@ export const handle = async (msg: Message) => {
 	} catch (e) {
 		sendDualResponse(
 			author,
-			mentionedMember.user,
+			matchMember.user,
 			`**${
-				mentionedMember.nickname || mentionedMember.user.username
+				matchMember.nickname || matchMember.user.username
 			}** failed to reply to your invitation.`,
 			`You failed to respond to the invitation from **${
 				msg.member?.nickname || author.username
@@ -160,36 +187,33 @@ export const handle = async (msg: Message) => {
 		let matchAge, matchLocation;
 
 		try {
-			matchAge = await getAge(mentionedMember.user);
+			matchAge = await getAge(matchMember.user);
 		} catch (e) {
-			await sendErrorDM(
-				mentionedMember.user,
-				"You failed to provide your age."
-			);
+			await sendErrorDM(matchMember.user, "You failed to provide your age.");
 		}
 
-		await sendSuccessDM(mentionedMember.user, `**Your age is: ${matchAge}**`);
+		await sendSuccessDM(matchMember.user, `**Your age is: ${matchAge}**`);
 
 		try {
-			matchLocation = await getLocation(mentionedMember.user);
+			matchLocation = await getLocation(matchMember.user);
 		} catch (e) {
 			await sendErrorDM(
-				mentionedMember.user,
+				matchMember.user,
 				"You failed to provide your location."
 			);
 		}
 
 		await sendSuccessDM(
-			mentionedMember.user,
+			matchMember.user,
 			`**Your location is: ${matchLocation}**`
 		);
 
 		if (!matchAge || !matchLocation) {
 			sendDualResponse(
 				author,
-				mentionedMember.user,
+				matchMember.user,
 				`**${
-					mentionedMember.nickname || mentionedMember.user.username
+					matchMember.nickname || matchMember.user.username
 				}** failed to reply to your invitation.`,
 				`You failed to respond to the invitation from **${
 					msg.member?.nickname || author.username
@@ -199,7 +223,7 @@ export const handle = async (msg: Message) => {
 		}
 
 		await sendSuccessDM(
-			mentionedMember.user,
+			matchMember.user,
 			`Please be patient until ${
 				msg.member?.nickname || author.username
 			} confirms this request.`
@@ -208,7 +232,8 @@ export const handle = async (msg: Message) => {
 		// get author confirmation
 		const confirmation = await getAuthorConfirmation(
 			author,
-			`${mentionedMember.nickname || mentionedMember.user.username}`,
+			`${matchMember.nickname || matchMember.user.username}`,
+			matchGender,
 			matchAge,
 			matchLocation
 		);
@@ -216,9 +241,9 @@ export const handle = async (msg: Message) => {
 		if (!confirmation) {
 			sendDualResponse(
 				author,
-				mentionedMember.user,
+				matchMember.user,
 				`You have cancelled the private chat invitation to **${
-					mentionedMember.nickname || mentionedMember.user.username
+					matchMember.nickname || matchMember.user.username
 				}**.`,
 				`Member **${
 					(msg.member?.nickname, author.username)
@@ -229,9 +254,9 @@ export const handle = async (msg: Message) => {
 
 		sendDualResponse(
 			author,
-			mentionedMember.user,
+			matchMember.user,
 			`You have confirmed the private chat invitation to member **${
-				mentionedMember.nickname || mentionedMember.user.username
+				matchMember.nickname || matchMember.user.username
 			}**.`,
 			`Member **${
 				msg.member?.nickname || author.username
@@ -245,7 +270,7 @@ export const handle = async (msg: Message) => {
 		};
 
 		const matchInfo: UserInfo = {
-			user: mentionedMember.user,
+			user: matchMember.user,
 			age: matchAge,
 			location: matchLocation,
 		};
@@ -256,9 +281,9 @@ export const handle = async (msg: Message) => {
 	} else {
 		sendDualResponse(
 			author,
-			mentionedMember.user,
+			matchMember.user,
 			`**${
-				mentionedMember.nickname || mentionedMember.user.username
+				matchMember.nickname || matchMember.user.username
 			}** rejected your private chat invitation.`,
 			`You have rejected the private chat invitation from **${
 				msg.member?.nickname || author.username
@@ -393,6 +418,7 @@ const sendErrorDM = async (user: User, text: string) => {
 const getAuthorConfirmation = async (
 	author: User,
 	matchName: string,
+	matchGender: string,
 	matchAge: number,
 	matchLocation: string
 ) => {
@@ -401,6 +427,7 @@ const getAuthorConfirmation = async (
 			color: 0xff007f,
 			description: `Here are the information about **${matchName}**. Would you like to continue?.`,
 			fields: [
+				{ name: "Gender", value: matchGender },
 				{ name: "Age", value: matchAge },
 				{ name: "Location", value: matchLocation },
 			],
@@ -443,7 +470,7 @@ const getAuthorConfirmation = async (
 const deleteMsgIfPossible = (msg: Message) => {
 	if (msg.channel.type != "dm") {
 		msg.react("✅");
-		msg.delete({ timeout: 5000 });
+		msg.delete({ timeout: 5000 }).catch((e) => {});
 	}
 };
 
@@ -508,4 +535,19 @@ const createMatch = async (
 			},
 		},
 	});
+};
+
+const getGender = (member: GuildMember) => {
+	const rolesNames = reactionRoleConfig["ROLE NAMES"];
+
+	let roleName: string = "";
+	Object.keys(rolesNames).every((roleId) => {
+		if (member.roles.cache.get(roleId)) {
+			roleName = rolesNames[roleId];
+			return false;
+		}
+		return true;
+	});
+
+	return roleName;
 };
