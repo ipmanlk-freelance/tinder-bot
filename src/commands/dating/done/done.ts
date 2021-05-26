@@ -136,10 +136,10 @@ export const handle = async (msg: Message) => {
 		authorMember.user,
 		matchMember.user,
 		`Your private chat with **${
-			authorMember.nickname || authorMember.user.username
+			matchMember.nickname || matchMember.user.username
 		}** has been closed.`,
 		`Your private chat with **${
-			matchMember.nickname || matchMember.user.username
+			authorMember.nickname || authorMember.user.username
 		}** has been closed.`
 	);
 };
