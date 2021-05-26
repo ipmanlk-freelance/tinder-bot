@@ -11,6 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "discord-paginationembed": "^2.1.0",
     "discord.js": "^12.5.3",
     "neverthrow": "^4.2.1",
     "sqlite": "^4.0.23",
