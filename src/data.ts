@@ -63,7 +63,7 @@ const getConnection = async () => {
 		});
 
 		await db.run(
-			"CREATE TABLE IF NOT EXISTS matches(channelId TEXT, authorId TEXT, matchId TEXT, PRIMARY KEY(channelId, memberId, matchId))"
+			"CREATE TABLE IF NOT EXISTS matches(channelId TEXT, authorId TEXT, matchId TEXT, PRIMARY KEY(channelId, authorId, matchId))"
 		);
 
 		connection = db;
