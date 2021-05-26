@@ -10,45 +10,60 @@ export const handle = async (msg: Message) => {
 		return;
 	}
 
+	const author = msg.author;
 	const mentionedMember = msg.mentions.members?.first();
 
 	if (!mentionedMember) {
-		msg
-			.reply({
-				embed: {
-					color: 0xff0000,
-					description: "Please mention a member to match.",
-				},
-			})
-			.then((m) => m.delete({ timeout: 5000 }));
-		msg.react("🛑");
-		msg.delete({ timeout: 5000 });
+		sendErrorDM(author, "Please mention a member to match.");
+		deleteMsgIfPossible(msg);
 		return;
 	}
 
-	if (mentionedMember.id == msg.author.id) {
-		msg
-			.reply({
-				embed: {
-					color: 0xff0000,
-					description: "You can't match yourself!.",
-				},
-			})
-			.then((m) => m.delete({ timeout: 5000 }));
-		msg.react("🛑");
-		msg.delete({ timeout: 5000 });
+	if (mentionedMember.id == author.id) {
+		sendErrorDM(author, "You can't match yourself.");
+		deleteMsgIfPossible(msg);
 		return;
 	}
 
-	msg.react("✅");
-	msg.delete({ timeout: 5000 });
+	let authorAge, authorLocation;
 
+	try {
+		authorAge = await getAge(author);
+	} catch (e) {
+		sendErrorDM(
+			author,
+			"You failed to provide your age. Please start a match again."
+		);
+		return;
+	}
+
+	await sendSuccessDM(author, `**Your age is: ${authorAge}**`);
+
+	try {
+		authorLocation = await getLocation(author);
+	} catch (e) {
+		sendErrorDM(
+			author,
+			"You failed to provide your location. Please start a match again."
+		);
+		return;
+	}
+
+	await sendSuccessDM(author, `**Your location is: ${authorLocation}**`);
+
+	await sendSuccessDM(author, `Please be patient until your match responds.`);
+
+	// invite to the matched user
 	const inviteMsg = await mentionedMember.send({
 		embed: {
 			color: 0xff007f,
 			description: `Member **${
 				msg.member?.nickname || msg.member?.user.username
-			}** would like to start a private conversation with you.`,
+			}** would like to start a private conversation with you.\n\nMember Formation,`,
+			fields: [
+				{ name: "Age", value: authorAge },
+				{ name: "Location", value: authorLocation },
+			],
 		},
 		footer: {
 			text: "Please react with 👍 to accept or 👎 to reject.",
@@ -66,6 +81,7 @@ export const handle = async (msg: Message) => {
 	};
 
 	let collected;
+
 	try {
 		collected = await inviteMsg.awaitReactions(filter, {
 			max: 1,
@@ -73,22 +89,16 @@ export const handle = async (msg: Message) => {
 			errors: ["time"],
 		});
 	} catch (e) {
-		msg.author.send({
-			embed: {
-				color: 0xff0000,
-				description: `**${
-					mentionedMember.nickname || mentionedMember.user.username
-				}** failed to reply to your invitation.`,
-			},
-		});
-		mentionedMember.user.send({
-			embed: {
-				color: 0xff0000,
-				description: `You failed to respond to the invitation from **${
-					msg.member?.nickname || msg.author.username
-				}**.`,
-			},
-		});
+		sendDualResponse(
+			author,
+			mentionedMember.user,
+			`**${
+				mentionedMember.nickname || mentionedMember.user.username
+			}** failed to reply to your invitation.`,
+			`You failed to respond to the invitation from **${
+				msg.member?.nickname || author.username
+			}**.`
+		);
 		return;
 	}
 
@@ -97,38 +107,277 @@ export const handle = async (msg: Message) => {
 	if (!reaction) return;
 
 	if (reaction.emoji.name === "👍") {
-		msg.author.send({
-			embed: {
-				color: 0x2d91e7,
-				description: `**${
+		// get match age and location
+		let matchAge, matchLocation;
+
+		try {
+			matchAge = await getAge(mentionedMember.user);
+		} catch (e) {
+			await sendErrorDM(
+				mentionedMember.user,
+				"You failed to provide your age."
+			);
+		}
+
+		await sendSuccessDM(mentionedMember.user, `**Your age is: ${matchAge}**`);
+
+		try {
+			matchLocation = await getLocation(mentionedMember.user);
+		} catch (e) {
+			await sendErrorDM(
+				mentionedMember.user,
+				"You failed to provide your location."
+			);
+		}
+
+		await sendSuccessDM(
+			mentionedMember.user,
+			`**Your location is: ${matchLocation}**`
+		);
+
+		if (!matchAge || !matchLocation) {
+			sendDualResponse(
+				author,
+				mentionedMember.user,
+				`**${
 					mentionedMember.nickname || mentionedMember.user.username
-				}** accepted your private chat invitation.`,
-			},
-		});
-		mentionedMember.user.send({
-			embed: {
-				color: 0x2d91e7,
-				description: `You accepted the invitation from **${
-					msg.member?.nickname || msg.author.username
+				}** failed to reply to your invitation.`,
+				`You failed to respond to the invitation from **${
+					msg.member?.nickname || author.username
+				}**.`
+			);
+			return;
+		}
+
+		await sendSuccessDM(
+			mentionedMember.user,
+			`Please be patient until ${
+				msg.member?.nickname || author.username
+			} confirms this request.`
+		);
+
+		// get author confirmation
+		const confirmation = await getAuthorConfirmation(
+			author,
+			`${mentionedMember.nickname || mentionedMember.user.username}`,
+			matchAge,
+			matchLocation
+		);
+
+		if (!confirmation) {
+			sendDualResponse(
+				author,
+				mentionedMember.user,
+				`You have cancelled the private chat invitation to **${
+					mentionedMember.nickname || mentionedMember.user.username
 				}**.`,
-			},
-		});
+				`Member **${
+					(msg.member?.nickname, author.username)
+				}** cancelled the private chat invitation.`
+			);
+			return;
+		}
+
+		sendDualResponse(
+			author,
+			mentionedMember.user,
+			`You have confirmed the private chat invitation to member **${
+				mentionedMember.nickname || mentionedMember.user.username
+			}**.`,
+			`Member **${
+				msg.member?.nickname || author.username
+			}** has confirmed the private chat invitation.`
+		);
 	} else {
-		msg.author.send({
+		sendDualResponse(
+			author,
+			mentionedMember.user,
+			`**${
+				mentionedMember.nickname || mentionedMember.user.username
+			}** rejected your private chat invitation.`,
+			`You have rejected the private chat invitation from **${
+				msg.member?.nickname || author.username
+			}**.`
+		);
+	}
+};
+
+const getAge = async (user: User) => {
+	let age: number = 0;
+
+	while (age == 0) {
+		const filter = (m: Message) => m.author.id == user.id;
+
+		const dm = await user.send({
 			embed: {
 				color: 0x2d91e7,
-				description: `**${
-					mentionedMember.nickname || mentionedMember.user.username
-				}** rejected your private chat invitation.`,
+				description: "Please provide your age: ",
+				footer: {
+					text: "Your age should be above 18",
+				},
 			},
 		});
-		mentionedMember.user.send({
+
+		const collected = await dm.channel.awaitMessages(filter, {
+			max: 1,
+			time: 300000,
+		});
+
+		if (collected.size == 0) {
+			throw "No age provided.";
+		}
+
+		const collectedAge = collected.first()?.content;
+
+		if (
+			collectedAge &&
+			!isNaN(parseInt(collectedAge)) &&
+			parseInt(collectedAge) < 90 &&
+			parseInt(collectedAge) >= 18
+		) {
+			age = parseInt(collectedAge);
+		} else {
+			user.send({
+				embed: {
+					color: 0xff0000,
+					description: "Please provide a valid age.",
+				},
+			});
+		}
+	}
+
+	return age;
+};
+
+const getLocation = async (user: User) => {
+	let location: string = "";
+
+	while (location == "") {
+		const filter = (m: Message) => m.author.id == user.id;
+
+		const dm = await user.send({
 			embed: {
 				color: 0x2d91e7,
-				description: `You have rejected the private chat invitation from **${
-					msg.member?.nickname || msg.author.username
-				}**.`,
+				description: "Please provide your location: ",
 			},
 		});
+
+		const collected = await dm.channel.awaitMessages(filter, {
+			max: 1,
+			time: 300000,
+		});
+
+		if (collected.size == 0) {
+			throw "No location provided.";
+		}
+
+		const collectedLocation = collected.first()?.content;
+
+		if (collectedLocation && collectedLocation.trim() != "") {
+			location = collectedLocation.trim();
+		} else {
+			user.send({
+				embed: {
+					color: 0xff0000,
+					description: "Please provide a valid location.",
+				},
+			});
+		}
+	}
+	return location;
+};
+
+const sendDualResponse = (
+	author: User,
+	match: User,
+	authorMsg: string,
+	matchMsg: string
+) => {
+	author.send({
+		embed: {
+			color: 0x2d91e7,
+			description: authorMsg,
+		},
+	});
+	match.send({
+		embed: {
+			color: 0x2d91e7,
+			description: matchMsg,
+		},
+	});
+};
+
+const sendSuccessDM = async (user: User, text: string) => {
+	await user.send({
+		embed: {
+			color: 0x2d91e7,
+			description: text,
+		},
+	});
+};
+
+const sendErrorDM = async (user: User, text: string) => {
+	await user.send({
+		embed: {
+			color: 0xff0000,
+			description: text,
+		},
+	});
+};
+
+const getAuthorConfirmation = async (
+	author: User,
+	matchName: string,
+	matchAge: number,
+	matchLocation: string
+) => {
+	const dm = await author.send({
+		embed: {
+			color: 0xff007f,
+			description: `Here are the information about **${matchName}**. Would you like to continue?.`,
+			fields: [
+				{ name: "Age", value: matchAge },
+				{ name: "Location", value: matchLocation },
+			],
+		},
+		footer: {
+			text: "Please react with 👍 to accept or 👎 to reject.",
+		},
+	});
+
+	await dm.react("👍");
+	await dm.react("👎");
+
+	const filter = (reaction: MessageReaction, user: User) => {
+		return ["👍", "👎"].includes(reaction.emoji.name) && user.id === author.id;
+	};
+
+	let collected;
+
+	try {
+		collected = await dm.awaitReactions(filter, {
+			max: 1,
+			time: 60000,
+			errors: ["time"],
+		});
+	} catch (e) {
+		return false;
+	}
+
+	const reaction = collected.first();
+
+	if (!reaction) return false;
+
+	if (reaction.emoji.name === "👍") {
+		return true;
+	} else {
+		return false;
+	}
+};
+
+const deleteMsgIfPossible = (msg: Message) => {
+	if (msg.channel.type != "dm") {
+		msg.react("✅");
+		msg.delete({ timeout: 5000 });
 	}
 };
