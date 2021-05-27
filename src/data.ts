@@ -127,6 +127,24 @@ export const getMemberInfo = async (memberId: string) => {
 	}
 };
 
+export const getPendingMatch = async (memberId: string) => {
+	const db = await getConnection();
+
+	const record = await db.get(
+		"SELECT * FROM pending_matches WHERE memberId = ?",
+		[memberId]
+	);
+
+	try {
+		return ok(record);
+	} catch (e) {
+		return err({
+			code: "INTERNAL",
+			error: e,
+		});
+	}
+};
+
 export const savePendingMatch = async (
 	memberId: string,
 	channelId: string

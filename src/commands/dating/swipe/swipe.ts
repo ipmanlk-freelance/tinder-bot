@@ -5,7 +5,11 @@ import {
 	Message,
 	MessageEmbed,
 } from "discord.js";
-import { getMemberInfo } from "../../../data";
+import {
+	getMemberInfo,
+	getPendingMatch,
+	savePendingMatch,
+} from "../../../data";
 const Pagination = require("discord-paginationembed");
 
 import { getBotConfig, getReactionRoleConfig } from "../../../util/config";
@@ -49,11 +53,37 @@ export const handle = async (msg: Message) => {
 		return;
 	}
 
-	if (!msg.guild || !msg.member) return;
+	if (!msg.guild || !msg.member) {
+		msg.delete({ timeout: 5000 }).catch((e) => {});
+		return;
+	}
+
+	const checkRes = await getPendingMatch(msg.member.id);
+
+	if (checkRes.isErr()) {
+		console.log(checkRes.error);
+		msg.delete({ timeout: 5000 });
+		return;
+	}
+
+	const record = checkRes.value;
+
+	if (record) {
+		msg
+			.reply(
+				`**You already have a match open in <#${checkRes.value.channelId}>. Please close it first before running this command.**`
+			)
+			.then((m) => m.delete({ timeout: 10000 }));
+		msg.delete({ timeout: 5000 }).catch((e) => {});
+		return;
+	}
 
 	const matchChannel = await createMatchChannel(msg.guild, msg.member);
 
-	if (!matchChannel) return;
+	if (!matchChannel) {
+		msg.delete({ timeout: 5000 }).catch((e) => {});
+		return;
+	}
 
 	const embeds: Array<MessageEmbed> = [];
 
@@ -138,7 +168,12 @@ export const handle = async (msg: Message) => {
 		.setEmojisFunctionAfterNavigation(true)
 		.build();
 
-	msg.delete({ timeout: 5000 }).catch((e) => {});
+	const res = await savePendingMatch(msg.author.id, matchChannel.id);
+
+	if (res.isErr()) {
+		console.log(res.error);
+		console.log("Failed to saved the pending match.");
+	}
 };
 
 const createMatchChannel = async (guild: Guild, member: GuildMember) => {
