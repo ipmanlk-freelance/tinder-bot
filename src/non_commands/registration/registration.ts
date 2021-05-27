@@ -10,7 +10,7 @@ export const startRegistration = async (
 	guild: Guild,
 	genderRoleMsg: Message
 ) => {
-	let userAge, userLocation;
+	let userAge, userLocation, favColor, favAnimal, height, happyReason;
 
 	const user = member.user;
 
@@ -26,19 +26,97 @@ export const startRegistration = async (
 	}
 
 	try {
-		userLocation = await getStringResponse(user, "location");
+		userLocation = await getStringResponse(
+			user,
+			"What is your location?",
+			"Failed to provide the location",
+			"Please provide a valid location"
+		);
 	} catch (e) {
 		sendErrorDM(
 			user,
-			`You failed to provide your age. Please run **${botConfig.PREFIX}register** in any channel in ${guild.name} to restart this.`
+			`You failed to provide your location. Please run **${botConfig.PREFIX}register** in any channel in ${guild.name} to restart this.`
 		);
 		removeReaction(genderRoleMsg, user.id);
 		return;
 	}
 
-	const res = await saveMemberInfo(user.id, userAge, userLocation);
+	try {
+		favColor = await getStringResponse(
+			user,
+			"What is your favourite color?",
+			"Failed to provide the favourite color",
+			"Please provide your favourite color"
+		);
+	} catch (e) {
+		sendErrorDM(
+			user,
+			`You failed to provide your favourite color. Please run **${botConfig.PREFIX}register** in any channel in ${guild.name} to restart this.`
+		);
+		removeReaction(genderRoleMsg, user.id);
+		return;
+	}
+
+	try {
+		favAnimal = await getStringResponse(
+			user,
+			"What is your favourite animal?",
+			"Failed to provide the favourite animal",
+			"Please provide your favourite animal"
+		);
+	} catch (e) {
+		sendErrorDM(
+			user,
+			`You failed to provide your favourite animal. Please run **${botConfig.PREFIX}register** in any channel in ${guild.name} to restart this.`
+		);
+		removeReaction(genderRoleMsg, user.id);
+		return;
+	}
+
+	try {
+		height = await getStringResponse(
+			user,
+			"How tall are you?",
+			"Failed to provide the height",
+			"Please provide your height"
+		);
+	} catch (e) {
+		sendErrorDM(
+			user,
+			`You failed to provide your height. Please run **${botConfig.PREFIX}register** in any channel in ${guild.name} to restart this.`
+		);
+		removeReaction(genderRoleMsg, user.id);
+		return;
+	}
+
+	try {
+		happyReason = await getStringResponse(
+			user,
+			"what makes you happy in life?",
+			"Failed to provide an answer",
+			"Please tell me what makes you happy in life"
+		);
+	} catch (e) {
+		sendErrorDM(
+			user,
+			`You failed to provide a response. Please run **${botConfig.PREFIX}register** in any channel in ${guild.name} to restart this.`
+		);
+		removeReaction(genderRoleMsg, user.id);
+		return;
+	}
+
+	const res = await saveMemberInfo(
+		user.id,
+		userAge,
+		userLocation,
+		favColor,
+		favAnimal,
+		height,
+		happyReason
+	);
 
 	if (res.isErr()) {
+		console.log(res.error);
 		sendErrorDM(
 			user,
 			"Failed to complete your registration. Please contact the staff."
@@ -61,6 +139,9 @@ export const startRegistration = async (
 	successEmbed.addField("Name", member.nickname || member.user.username);
 	successEmbed.addField("Gender", getGender(member));
 	successEmbed.addField("Age", userAge);
+	successEmbed.addField("Favorite Color", favColor);
+	successEmbed.addField("Favorite Animal", favAnimal);
+	successEmbed.addField("What makes you happy?", happyReason);
 	successEmbed.setFooter(
 		`You can now run **${botConfig.PREFIX}match** command to file matches in ${guild.name} server`
 	);
@@ -90,7 +171,7 @@ const getAge = async (user: User) => {
 		const dm = await user.send({
 			embed: {
 				color: 0xff007f,
-				description: "Please provide your age: ",
+				description: "How old are you?",
 				footer: {
 					text: "Your age should be above 16",
 				},
@@ -128,7 +209,12 @@ const getAge = async (user: User) => {
 	return age;
 };
 
-const getStringResponse = async (user: User, information: string) => {
+const getStringResponse = async (
+	user: User,
+	request: string,
+	nonError: string,
+	invalidError: string
+) => {
 	let response: string = "";
 
 	while (response == "") {
@@ -137,7 +223,7 @@ const getStringResponse = async (user: User, information: string) => {
 		const dm = await user.send({
 			embed: {
 				color: 0xff007f,
-				description: "Please provide your location: ",
+				description: request,
 			},
 		});
 
@@ -147,7 +233,7 @@ const getStringResponse = async (user: User, information: string) => {
 		});
 
 		if (collected.size == 0) {
-			throw `No ${information} provided.`;
+			throw nonError;
 		}
 
 		const collectedResponse = collected.first()?.content;
@@ -158,7 +244,7 @@ const getStringResponse = async (user: User, information: string) => {
 			user.send({
 				embed: {
 					color: 0xff0000,
-					description: `Please provide a valid ${information}.`,
+					description: invalidError,
 				},
 			});
 		}

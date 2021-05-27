@@ -88,13 +88,17 @@ export const deleteMatch = async (
 export const saveMemberInfo = async (
 	memberId: string,
 	age: number,
-	location: string
+	location: string,
+	favColor: string,
+	favAnimal: string,
+	height: string,
+	happyReason: string
 ): Promise<Result<true, DBError>> => {
 	const db = await getConnection();
 	try {
 		await db.run(
-			"INSERT INTO member_info(memberId, age, location) VALUES(?,?, ?)",
-			[memberId, age, location]
+			"INSERT INTO member_info(memberId, age, location, fav_color, fav_animal, height, happy_reason) VALUES(?,?,?,?,?,?, ?)",
+			[memberId, age, location, favColor, favAnimal, height, happyReason]
 		);
 
 		return ok(true);
@@ -138,7 +142,7 @@ const getConnection = async () => {
 			"CREATE TABLE IF NOT EXISTS matches(channelId TEXT, authorId TEXT, matchId TEXT, PRIMARY KEY(channelId, authorId, matchId))"
 		);
 		await db.run(
-			"CREATE TABLE IF NOT EXISTS member_info(memberId TEXT, age INTEGER, location TEXT, PRIMARY KEY(memberId))"
+			"CREATE TABLE IF NOT EXISTS member_info(memberId TEXT, age INTEGER, location TEXT, fav_color TEXT, fav_animal TEXT, height TEXT, happy_reason TEXT, PRIMARY KEY(memberId))"
 		);
 		connection = db;
 		return db;
