@@ -70,19 +70,25 @@ export class ReactionRole extends EventEmitter {
 				});
 
 				if (uniqueRole) {
-					this.emit("hasUniqueRole" as ErrorEvents, [
+					this.emit(
+						"hasUniqueRole" as ErrorEvents,
 						member,
 						uniqueRole,
-						this.uniqueRoleIds,
-					]);
+						this.uniqueRoleIds
+					);
 					return;
 				}
 			}
 
 			await member.roles.add(roleInfo.role);
-			this.emit("roleAdd" as SuccessEvents, [member, roleInfo.role]);
+			this.emit(
+				"roleAdd" as SuccessEvents,
+				member,
+				roleInfo.role,
+				reaction.message
+			);
 		} catch (e) {
-			this.emit("error" as ErrorEvents, [{ error: e }]);
+			this.emit("error" as ErrorEvents, { error: e });
 		}
 	}
 
@@ -107,9 +113,9 @@ export class ReactionRole extends EventEmitter {
 			if (!roleInfo) return;
 
 			await member.roles.remove(roleInfo.role);
-			this.emit("roleRemove" as SuccessEvents, [member, roleInfo.role]);
+			this.emit("roleRemove" as SuccessEvents, member, roleInfo.role);
 		} catch (e) {
-			this.emit("error" as ErrorEvents, [{ error: e }]);
+			this.emit("error" as ErrorEvents, { error: e });
 		}
 	}
 

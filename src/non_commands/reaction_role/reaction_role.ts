@@ -3,6 +3,8 @@ import { ReactionRole } from "./ReactionRole";
 
 import { getBotConfig } from "../../util/config";
 import { parseYAML } from "../../util/parse";
+import { getMemberInfo } from "../../data";
+import { startRegistration } from "../registration/registration";
 
 const botConfig: any = getBotConfig();
 const cmdConfig: any = parseYAML(`${__dirname}/reaction_role.yaml`);
@@ -74,7 +76,15 @@ export const init = async (client: Client) => {
 
 	const rr = new ReactionRole(client, rrRoles);
 
-	rr.on("roleAdd", (member, role) => {
+	rr.on("roleAdd", async (member, role, reactionRoleMsg) => {
+		// perform a db check to see if user is registered
+		const res = await getMemberInfo(member.id);
+
+		if (res.isErr()) {
+			console.log("Unable to get member info", res.error);
+			return;
+		}
+		startRegistration(member, reactionRoleMsg.guild, reactionRoleMsg);
 		console.log("roleAdd");
 	});
 

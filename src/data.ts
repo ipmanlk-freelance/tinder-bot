@@ -85,6 +85,44 @@ export const deleteMatch = async (
 	}
 };
 
+export const saveMemberInfo = async (
+	memberId: string,
+	age: number,
+	location: string
+): Promise<Result<true, DBError>> => {
+	const db = await getConnection();
+	try {
+		await db.run(
+			"INSERT INTO member_info(memberId, age, location) VALUES(?,?, ?)",
+			[memberId, age, location]
+		);
+
+		return ok(true);
+	} catch (e) {
+		return err({
+			code: "INTERNAL",
+			error: e,
+		});
+	}
+};
+
+export const getMemberInfo = async (memberId: string) => {
+	const db = await getConnection();
+
+	const record = await db.get("SELECT * FROM member_info WHERE memberId = ?", [
+		memberId,
+	]);
+
+	try {
+		return ok(record);
+	} catch (e) {
+		return err({
+			code: "INTERNAL",
+			error: e,
+		});
+	}
+};
+
 const getConnection = async () => {
 	try {
 		if (connection) {
@@ -99,7 +137,9 @@ const getConnection = async () => {
 		await db.run(
 			"CREATE TABLE IF NOT EXISTS matches(channelId TEXT, authorId TEXT, matchId TEXT, PRIMARY KEY(channelId, authorId, matchId))"
 		);
-
+		await db.run(
+			"CREATE TABLE IF NOT EXISTS member_info(memberId TEXT, age INTEGER, location TEXT, PRIMARY KEY(memberId))"
+		);
 		connection = db;
 		return db;
 	} catch (e) {
