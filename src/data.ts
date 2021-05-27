@@ -182,6 +182,22 @@ export const clearPendingMatch = async (
 	}
 };
 
+export const deleteIfExists = async (channelId: string) => {
+	const db = await getConnection();
+	try {
+		await db.run("DELETE FROM matches WHERE channelId = ?", [channelId]);
+		await db.run("DELETE FROM pending_matches WHERE channelId = ?", [
+			channelId,
+		]);
+		return ok(true);
+	} catch (e) {
+		return err({
+			code: "INTERNAL",
+			error: e,
+		});
+	}
+};
+
 const getConnection = async () => {
 	try {
 		if (connection) {
