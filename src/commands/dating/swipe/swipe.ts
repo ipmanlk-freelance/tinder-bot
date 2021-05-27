@@ -1,4 +1,11 @@
-import { Message, MessageEmbed } from "discord.js";
+import {
+	CategoryChannel,
+	Guild,
+	GuildMember,
+	Message,
+	MessageEmbed,
+} from "discord.js";
+import { getMemberInfo } from "../../../data";
 const Pagination = require("discord-paginationembed");
 
 import { getBotConfig, getReactionRoleConfig } from "../../../util/config";
@@ -10,10 +17,6 @@ const reactionRoleConfig: any = getReactionRoleConfig();
 
 export const handle = async (msg: Message) => {
 	const genderRoleNames = reactionRoleConfig["ROLE NAMES"];
-
-	if (cmdConfig["SWIPE CHANNEL"] !== msg.channel.id) {
-		return;
-	}
 
 	const mentionedGenderRole = msg.mentions.roles.first();
 
@@ -46,19 +49,32 @@ export const handle = async (msg: Message) => {
 		return;
 	}
 
+	if (!msg.guild || !msg.member) return;
+
+	const matchChannel = await createMatchChannel(msg.guild, msg.member);
+
+	if (!matchChannel) return;
+
 	const embeds: Array<MessageEmbed> = [];
 
-	mentionedGenderRole.members.forEach((member) => {
+	for (const member of mentionedGenderRole.members.array()) {
 		const embed = new MessageEmbed();
 		const avatarUrl = member.user.avatarURL();
 
 		if (avatarUrl) {
 			embed.setImage(avatarUrl);
 		}
-
 		embed.setThumbnail(
 			"https://cdn.discordapp.com/attachments/847152087304241182/847154551748558848/14980362bff8218406381df35beaa368.gif"
 		);
+
+		const res = await getMemberInfo(member.id);
+
+		if (res.isErr()) continue;
+
+		const memberInfo = res.value;
+
+		if (!memberInfo) continue;
 
 		embed.fields = [
 			{
@@ -69,28 +85,104 @@ export const handle = async (msg: Message) => {
 			{
 				name: "Gender",
 				value: genderRoleNames[mentionedGenderRole.id],
+				inline: true,
+			},
+			{
+				name: "Age",
+				value: memberInfo.age,
+				inline: true,
+			},
+			{
+				name: "Height",
+				value: memberInfo.height,
+				inline: true,
+			},
+			{
+				name: "Location",
+				value: memberInfo.location,
+				inline: true,
+			},
+			{
+				name: "Favorite Color",
+				value: memberInfo.fav_color,
+				inline: true,
+			},
+			{
+				name: "Favorite Animal",
+				value: memberInfo.fav_animal,
+				inline: true,
+			},
+			{
+				name: "What makes this person happy?",
+				value: memberInfo.happy_reason,
+				inline: true,
+			},
+			{
+				name: "ID",
+				value: member.id,
 				inline: false,
 			},
 		];
 		embeds.push(embed);
-	});
-
-	const dm = await msg.author.send({
-		embed: {
-			color: 0x2d91e7,
-			description:
-				"Please be patient. You will get all machines in a few moments.",
-		},
-	});
+	}
 
 	new Pagination.Embeds()
 		.setArray(embeds)
 		.setAuthorizedUsers([msg.author.id])
-		.setChannel(dm.channel)
-		.setColor(0x2d91e7)
-		.setFooter("Please goto #match channel to start a chat with this person.")
+		.setChannel(matchChannel)
+		.setColor(0xff007f)
 		.setPageIndicator(false)
+		.addFunctionEmoji("💓", (_: any, instance: any) => {
+			matchChannel.send("This will run a match (test)");
+		})
+		.setEmojisFunctionAfterNavigation(true)
 		.build();
 
 	msg.delete({ timeout: 5000 }).catch((e) => {});
+};
+
+const createMatchChannel = async (guild: Guild, member: GuildMember) => {
+	// find category
+	const category = guild.channels.cache.get(cmdConfig["DATING CATEGORY"]);
+
+	if (!category || category.type != "category") {
+		console.log(
+			"Failed to locate the dating category channel. Please check your configuration."
+		);
+		return;
+	}
+	const categoryChannel = category as CategoryChannel;
+
+	// create a new channel
+	const channelName = `match-${categoryChannel.children.size + 1}`;
+
+	const datingChannel = await guild.channels
+		.create(channelName, {
+			type: "text",
+			permissionOverwrites: [
+				{ id: guild.roles.everyone, deny: "VIEW_CHANNEL" },
+				{ id: member, allow: "VIEW_CHANNEL" },
+			],
+			parent: categoryChannel,
+		})
+		.catch((e) => {
+			console.log(
+				"Failed to create a dating channel. Please check your bot permissions and configuration."
+			);
+		});
+
+	if (!datingChannel) return;
+
+	datingChannel.send(`<@${member.user.id}>,`, {
+		embed: {
+			title: "Swipe Channel",
+			color: 0xff007f,
+			description: `Please be patient. You will get all machines in a few moments.\n\nYou can select a match to contact by reacting with ().`,
+			footer: {
+				text: `Please use ${botConfig.PREFIX}done command to close this private chat.`,
+			},
+		},
+	});
+
+	return datingChannel;
 };
