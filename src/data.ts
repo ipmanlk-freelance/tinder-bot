@@ -127,6 +127,43 @@ export const getMemberInfo = async (memberId: string) => {
 	}
 };
 
+export const savePendingMatch = async (
+	memberId: string,
+	channelId: string
+): Promise<Result<true, DBError>> => {
+	const db = await getConnection();
+
+	try {
+		await db.run(
+			"INSERT INTO pending_matches(memberId, channelId) VALUES(?,?)",
+			[memberId, channelId]
+		);
+
+		return ok(true);
+	} catch (e) {
+		return err({
+			code: "INTERNAL",
+			error: e,
+		});
+	}
+};
+
+export const clearPendingMatch = async (
+	memberId: string
+): Promise<Result<true, DBError>> => {
+	const db = await getConnection();
+
+	try {
+		await db.run("DELETE FROM pending_matches WHERE memberId = ?", [memberId]);
+		return ok(true);
+	} catch (e) {
+		return err({
+			code: "INTERNAL",
+			error: e,
+		});
+	}
+};
+
 const getConnection = async () => {
 	try {
 		if (connection) {
@@ -143,6 +180,9 @@ const getConnection = async () => {
 		);
 		await db.run(
 			"CREATE TABLE IF NOT EXISTS member_info(memberId TEXT, age INTEGER, location TEXT, fav_color TEXT, fav_animal TEXT, height TEXT, happy_reason TEXT, PRIMARY KEY(memberId))"
+		);
+		await db.run(
+			"CREATE TABLE IF NOT EXISTS pending_matches(memberId TEXT, channelId TEXT, PRIMARY KEY(memberId, channelId))"
 		);
 		connection = db;
 		return db;
