@@ -55,14 +55,15 @@ export const handle = async (msg: Message) => {
 			.then((m) => m.delete({ timeout: 5000 }));
 		msg.react("🛑");
 		msg.delete({ timeout: 5000 }).catch((e) => {});
-
 		return;
 	}
 
 	const authorMember = msg.member;
+	const guild = msg.guild;
 
-	if (!msg.guild || !authorMember) {
-		msg.delete({ timeout: 5000 }).catch((e) => {});
+	msg.delete({ timeout: 5000 }).catch((e) => {});
+
+	if (!guild || !authorMember) {
 		return;
 	}
 
@@ -70,7 +71,6 @@ export const handle = async (msg: Message) => {
 
 	if (checkRes.isErr()) {
 		console.log(checkRes.error);
-		msg.delete({ timeout: 5000 }).catch((e) => {});
 		return;
 	}
 
@@ -82,14 +82,12 @@ export const handle = async (msg: Message) => {
 				`**You already have a match open in <#${checkRes.value.channelId}>. Please close it first before running this command.**`
 			)
 			.then((m) => m.delete({ timeout: 10000 }));
-		msg.delete({ timeout: 5000 }).catch((e) => {});
 		return;
 	}
 
-	const matchChannel = await createMatchChannel(msg.guild, authorMember);
+	const matchChannel = await createMatchChannel(guild, authorMember);
 
 	if (!matchChannel) {
-		msg.delete({ timeout: 5000 }).catch((e) => {});
 		return;
 	}
 
@@ -276,14 +274,22 @@ const inviteMatch = async (
 			description: `Member **${
 				authorMember.nickname || authorMember.user.username
 			}** would like to start a private conversation with you.\n\nMember Formation,`,
+			image: {
+				url:
+					authorMember.user.avatarURL() ||
+					"https://media2.giphy.com/media/hut4WMshl8Uxdpb0Ff/giphy.gif",
+			},
+			thumbnail: {
+				url: "https://media.tenor.com/images/411a706908ece27575fc0d5e500dde66/tenor.gif",
+			},
 			fields: getMemberInfoEmbedFields(
 				authorMember.nickname || authorMember.user.username,
 				genderRoleNames[genderRole.id],
 				memberInfo
 			),
-		},
-		footer: {
-			text: "Please react with 👍 to accept or 👎 to reject.",
+			footer: {
+				text: "Please react with 👍 to accept or 👎 to reject.",
+			},
 		},
 	});
 
