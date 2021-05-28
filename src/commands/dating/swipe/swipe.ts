@@ -181,7 +181,12 @@ export const handle = async (msg: Message) => {
 		.setPageIndicator(false)
 		.setEmojisFunctionAfterNavigation(true)
 		.addFunctionEmoji("💓", (_: any, instance: any) => {
-			inviteMatch(authorMember, mentionedGenderRole, matchChannel, msg.client);
+			inviteMatch(
+				authorMember,
+				getGender(authorMember),
+				matchChannel,
+				msg.client
+			);
 		})
 		.build();
 
@@ -244,7 +249,7 @@ const createMatchChannel = async (guild: Guild, member: GuildMember) => {
 
 const inviteMatch = async (
 	authorMember: GuildMember,
-	genderRole: Role,
+	gender: string,
 	matchChannel: TextChannel,
 	client: Client
 ) => {
@@ -330,7 +335,7 @@ const inviteMatch = async (
 			},
 			fields: getMemberInfoEmbedFields(
 				authorMember.nickname || authorMember.user.username,
-				genderRoleNames[genderRole.id],
+				gender,
 				memberInfo
 			),
 			footer: {
