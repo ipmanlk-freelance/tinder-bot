@@ -43,6 +43,9 @@ export const handle = async (msg: Message) => {
 					url: "https://media2.giphy.com/media/l2ZDYicAc3XXjkpWw/giphy.gif",
 				},
 				description: `Please be patient. I will close this channel in few moments.`,
+				image: {
+					url: "https://cdn.discordapp.com/attachments/846958272887390221/847739963508523028/70bdede70c29d59ad9e2d54678c3d85d.gif",
+				},
 			},
 		});
 
@@ -164,6 +167,9 @@ export const handle = async (msg: Message) => {
 			color: 0x2d91e7,
 			description:
 				"**Closing has been confirmed. This private channel will close in few moments.**",
+			image: {
+				url: "https://cdn.discordapp.com/attachments/846958272887390221/847739963508523028/70bdede70c29d59ad9e2d54678c3d85d.gif",
+			},
 		},
 	});
 
