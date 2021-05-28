@@ -169,7 +169,7 @@ export const handle = async (msg: Message) => {
 
 	setTimeout(() => {
 		matchChannel.delete().catch((e) => console.log(e));
-	}, 10000);
+	}, 20000);
 
 	sendDualResponse(
 		authorMember.user,

@@ -19,7 +19,7 @@ export const startRegistration = async (
 	} catch (e) {
 		sendErrorDM(
 			user,
-			`You failed to provide your age. Please run **${botConfig.PREFIX}register** in any channel in ${guild.name} to restart this.`
+			`You failed to provide your age. Please run ${botConfig.PREFIX}register in any channel in ${guild.name} to restart this.`
 		);
 		removeReaction(genderRoleMsg, user.id);
 		return;
@@ -35,7 +35,7 @@ export const startRegistration = async (
 	} catch (e) {
 		sendErrorDM(
 			user,
-			`You failed to provide your location. Please run **${botConfig.PREFIX}register** in any channel in ${guild.name} to restart this.`
+			`You failed to provide your location. Please run ${botConfig.PREFIX}register in any channel in ${guild.name} to restart this.`
 		);
 		removeReaction(genderRoleMsg, user.id);
 		return;
@@ -51,7 +51,7 @@ export const startRegistration = async (
 	} catch (e) {
 		sendErrorDM(
 			user,
-			`You failed to provide your favourite color. Please run **${botConfig.PREFIX}register** in any channel in ${guild.name} to restart this.`
+			`You failed to provide your favourite color. Please run ${botConfig.PREFIX}register in any channel in ${guild.name} to restart this.`
 		);
 		removeReaction(genderRoleMsg, user.id);
 		return;
@@ -67,7 +67,7 @@ export const startRegistration = async (
 	} catch (e) {
 		sendErrorDM(
 			user,
-			`You failed to provide your favourite animal. Please run **${botConfig.PREFIX}register** in any channel in ${guild.name} to restart this.`
+			`You failed to provide your favourite animal. Please run ${botConfig.PREFIX}register in any channel in ${guild.name} to restart this.`
 		);
 		removeReaction(genderRoleMsg, user.id);
 		return;
@@ -83,7 +83,7 @@ export const startRegistration = async (
 	} catch (e) {
 		sendErrorDM(
 			user,
-			`You failed to provide your height. Please run **${botConfig.PREFIX}register** in any channel in ${guild.name} to restart this.`
+			`You failed to provide your height. Please run ${botConfig.PREFIX}register in any channel in ${guild.name} to restart this.`
 		);
 		removeReaction(genderRoleMsg, user.id);
 		return;
@@ -99,7 +99,7 @@ export const startRegistration = async (
 	} catch (e) {
 		sendErrorDM(
 			user,
-			`You failed to provide a response. Please run **${botConfig.PREFIX}register** in any channel in ${guild.name} to restart this.`
+			`You failed to provide a response. Please run ${botConfig.PREFIX}register in any channel in ${guild.name} to restart this.`
 		);
 		removeReaction(genderRoleMsg, user.id);
 		return;
@@ -143,7 +143,7 @@ export const startRegistration = async (
 	successEmbed.addField("Favorite Animal", favAnimal);
 	successEmbed.addField("What makes you happy?", happyReason);
 	successEmbed.setFooter(
-		`You can now run **${botConfig.PREFIX}match** command to file matches in ${guild.name} server`
+		`You can now run ${botConfig.PREFIX}match command to file matches in ${guild.name} server`
 	);
 
 	user.send({ embed: successEmbed });
@@ -173,7 +173,7 @@ const getAge = async (user: User) => {
 				color: 0xff007f,
 				description: "How old are you?",
 				footer: {
-					text: "Your age should be above 16",
+					text: "Datecord 👄 | Your age should be above 16",
 				},
 			},
 		});
@@ -224,6 +224,9 @@ const getStringResponse = async (
 			embed: {
 				color: 0xff007f,
 				description: request,
+				footer: {
+					text: `Datecord 👄`,
+				},
 			},
 		});
 

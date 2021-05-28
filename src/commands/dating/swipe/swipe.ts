@@ -1,9 +1,11 @@
 import {
 	CategoryChannel,
+	Client,
 	Guild,
 	GuildMember,
 	Message,
 	MessageEmbed,
+	TextChannel,
 } from "discord.js";
 import {
 	getMemberInfo,
@@ -53,12 +55,14 @@ export const handle = async (msg: Message) => {
 		return;
 	}
 
-	if (!msg.guild || !msg.member) {
+	const authorMember = msg.member;
+
+	if (!msg.guild || !authorMember) {
 		msg.delete({ timeout: 5000 }).catch((e) => {});
 		return;
 	}
 
-	const checkRes = await getPendingMatch(msg.member.id);
+	const checkRes = await getPendingMatch(authorMember.id);
 
 	if (checkRes.isErr()) {
 		console.log(checkRes.error);
@@ -78,7 +82,7 @@ export const handle = async (msg: Message) => {
 		return;
 	}
 
-	const matchChannel = await createMatchChannel(msg.guild, msg.member);
+	const matchChannel = await createMatchChannel(msg.guild, authorMember);
 
 	if (!matchChannel) {
 		msg.delete({ timeout: 5000 }).catch((e) => {});
@@ -156,16 +160,22 @@ export const handle = async (msg: Message) => {
 		embeds.push(embed);
 	}
 
-	new Pagination.Embeds()
+	if (embeds.length == 0) {
+		const embed = new MessageEmbed();
+		embed.setDescription("Sorry!. There are no members with this role.");
+		embeds.push(embed);
+	}
+
+	const paginatedEmbed = new Pagination.Embeds()
 		.setArray(embeds)
 		.setAuthorizedUsers([msg.author.id])
 		.setChannel(matchChannel)
 		.setColor(0xff007f)
 		.setPageIndicator(false)
-		.addFunctionEmoji("💓", (_: any, instance: any) => {
-			matchChannel.send("This will run a match (test)");
-		})
 		.setEmojisFunctionAfterNavigation(true)
+		.addFunctionEmoji("💓", (_: any, instance: any) => {
+			inviteMatch(authorMember, matchChannel, msg.client);
+		})
 		.build();
 
 	const res = await savePendingMatch(msg.author.id, matchChannel.id);
@@ -174,6 +184,53 @@ export const handle = async (msg: Message) => {
 		console.log(res.error);
 		console.log("Failed to saved the pending match.");
 	}
+};
+
+const inviteMatch = async (
+	authorMember: GuildMember,
+	matchChannel: TextChannel,
+	client: Client
+) => {
+	const clientUser = client.user;
+	let matchId: string = "";
+
+	if (!clientUser) {
+		console.log("failed to find client user");
+		return;
+	}
+
+	const msgs = await matchChannel.messages.fetch();
+	msgs.every((msg) => {
+		if (msg.embeds.length == 0) return true;
+		if (msg.author.id != clientUser.id) return true;
+
+		for (const embed of msg.embeds) {
+			const field = embed.fields.find((f) => f.name == "ID");
+			if (!field) continue;
+			matchId = field.value;
+			return false;
+		}
+
+		return true;
+	});
+
+	// delete all bot msgs
+	const botMsgs = msgs.filter((m) => m.author.id == clientUser.id);
+	await matchChannel.bulkDelete(botMsgs);
+
+	await matchChannel.send(`<@${authorMember.id}>,`, {
+		embed: {
+			title: "Waiting for an response",
+			color: 0xff007f,
+			thumbnail: {
+				url: "https://media1.tenor.com/images/3d236166f36b07b08c115dc43bc8253f/tenor.gif",
+			},
+			description: `**I sent an invite to the person you like. Please be patient until that person responds.**`,
+			footer: {
+				text: `Please use ${botConfig.PREFIX}done command to close this private chat.`,
+			},
+		},
+	});
 };
 
 const createMatchChannel = async (guild: Guild, member: GuildMember) => {
@@ -212,9 +269,12 @@ const createMatchChannel = async (guild: Guild, member: GuildMember) => {
 		embed: {
 			title: "Swipe Channel",
 			color: 0xff007f,
-			description: `Please be patient. You will get all machines in a few moments.\n\nYou can select a match to contact by reacting with ().`,
+			thumbnail: {
+				url: "https://media1.tenor.com/images/9586846990183c06e768204cd0593eee/tenor.gif?itemid=4988595",
+			},
+			description: `Please be patient. You will get all machines in a few moments.\n\nYou can select a match to contact by reacting with 💓.`,
 			footer: {
-				text: `Please use **${botConfig.PREFIX}done** command to close this private chat.`,
+				text: `Please use ${botConfig.PREFIX}done command to close this private chat.`,
 			},
 		},
 	});
