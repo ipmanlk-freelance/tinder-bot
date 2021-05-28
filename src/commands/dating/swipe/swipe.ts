@@ -133,7 +133,6 @@ export const handle = async (msg: Message) => {
 	if (!matchChannel) {
 		return;
 	}
-
 	const embeds: Array<MessageEmbed> = [];
 
 	for (const member of mentionedGenderRole.members.array()) {
@@ -159,7 +158,7 @@ export const handle = async (msg: Message) => {
 		if (!memberInfo) continue;
 
 		embed.fields = getMemberInfoEmbedFields(
-			authorMember.nickname || authorMember.user.username,
+			member.nickname || member.user.username,
 			genderRoleNames[mentionedGenderRole.id],
 			memberInfo
 		);
@@ -303,15 +302,15 @@ const inviteMatch = async (
 		return;
 	}
 
-	const memberInfoRes = await getMemberInfo(matchMember.user.id);
+	const authorInfoRes = await getMemberInfo(authorMember.user.id);
 
-	if (memberInfoRes.isErr()) {
+	if (authorInfoRes.isErr()) {
 		console.log("Unable to get member info.");
-		console.log(memberInfoRes.error);
+		console.log(authorInfoRes.error);
 		return;
 	}
 
-	const memberInfo = memberInfoRes.value;
+	const memberInfo = authorInfoRes.value;
 
 	if (!memberInfo) {
 		console.log(`Member ${matchMember.id} is not registered.`);
