@@ -96,6 +96,7 @@ export const saveMemberInfo = async (
 ): Promise<Result<true, DBError>> => {
 	const db = await getConnection();
 	try {
+		await db.run("DELETE FROM member_info WHERE memberId = ?", [memberId]);
 		await db.run(
 			"INSERT INTO member_info(memberId, age, location, fav_color, fav_animal, height, happy_reason) VALUES(?,?,?,?,?,?, ?)",
 			[memberId, age, location, favColor, favAnimal, height, happyReason]
