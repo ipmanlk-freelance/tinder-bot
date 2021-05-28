@@ -3,8 +3,5 @@
 # if anyone can run this command, you can use PUBLIC.
 ALLOWED ROLES: ["PUBLIC"]
 
-# Channel ID used to run the match command in
-MATCH CHANNEL: "846982184611217429"
-
 # Category id used to create dating channels
 DATING CATEGORY: "847723966025433088"

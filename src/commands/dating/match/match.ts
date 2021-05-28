@@ -21,10 +21,6 @@ const cmdConfig: any = parseYAML(`${__dirname}/match.yaml`);
 const reactionRoleConfig: any = getReactionRoleConfig();
 
 export const handle = async (msg: Message) => {
-	if (cmdConfig["MATCH CHANNEL"] !== msg.channel.id) {
-		return;
-	}
-
 	const clientUser = msg.client.user;
 	const msgChannel = msg.channel;
 	const guild = msg.guild;
