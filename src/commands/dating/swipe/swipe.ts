@@ -214,7 +214,7 @@ const createMatchChannel = async (guild: Guild, member: GuildMember) => {
 			color: 0xff007f,
 			description: `Please be patient. You will get all machines in a few moments.\n\nYou can select a match to contact by reacting with ().`,
 			footer: {
-				text: `Please use ${botConfig.PREFIX}done command to close this private chat.`,
+				text: `Please use **${botConfig.PREFIX}done** command to close this private chat.`,
 			},
 		},
 	});

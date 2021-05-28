@@ -1,5 +1,10 @@
 import { Message, MessageReaction, User } from "discord.js";
-import { deleteMatch, getMatch } from "../../../data";
+import {
+	clearPendingMatch,
+	deleteMatch,
+	getMatch,
+	getPendingMatch,
+} from "../../../data";
 import { getBotConfig } from "../../../util/config";
 import { parseYAML } from "../../../util/parse";
 
@@ -19,6 +24,40 @@ export const handle = async (msg: Message) => {
 	const matchChannel = msg.channel;
 
 	msg.delete({ timeout: 5000 });
+
+	// check if this is a pending channel
+	const pendingRes = await getPendingMatch(msg.author.id);
+
+	if (pendingRes.isErr()) {
+		console.log(pendingRes.error);
+		console.log("Unable to access the database.");
+		return;
+	}
+
+	if (pendingRes.value) {
+		msg.channel.send(`<@${msg.author.id}>,`, {
+			embed: {
+				title: "Channel is closing",
+				color: 0xff007f,
+				thumbnail: {
+					url: "https://media2.giphy.com/media/l2ZDYicAc3XXjkpWw/giphy.gif",
+				},
+				description: `Please be patient. I will close this channel in few moments.`,
+			},
+		});
+
+		const clearRes = await clearPendingMatch(msg.author.id);
+
+		if (clearRes.isErr()) {
+			console.log(clearRes.error);
+			return;
+		}
+
+		setTimeout(() => {
+			msg.channel.delete();
+		}, 10000);
+		return;
+	}
 
 	// get dating channel info
 	const res = await getMatch(msg.channel.id);
