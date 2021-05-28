@@ -28,6 +28,49 @@ const reactionRoleConfig: any = getReactionRoleConfig();
 const genderRoleNames = reactionRoleConfig["ROLE NAMES"];
 
 export const handle = async (msg: Message) => {
+	if (!msg.member) return;
+
+	// check author has a gender role
+	const authorGender = getGender(msg.member);
+	if (authorGender.trim() == "") {
+		msg
+			.reply({
+				embed: {
+					color: 0xff0000,
+					description:
+						"Please add a gender role first before starting a swipe.",
+				},
+			})
+			.then((m) => m.delete({ timeout: 5000 }));
+		msg.react("🛑");
+		msg.delete({ timeout: 5000 }).catch((e) => {});
+		return;
+	}
+
+	// check member is registered
+	const authorInfoRes = await getMemberInfo(msg.author.id);
+
+	if (authorInfoRes.isErr()) {
+		console.log("Unable to access the database.");
+		console.log(authorInfoRes.error);
+		return;
+	}
+
+	if (!authorInfoRes.value) {
+		msg
+			.reply({
+				embed: {
+					title: "You are not registered!.",
+					color: 0xff0000,
+					description: `Please register with **${botConfig.PREFIX}register** command before running a swipe.`,
+				},
+			})
+			.then((m) => m.delete({ timeout: 10000 }));
+		msg.react("🛑");
+		msg.delete({ timeout: 5000 }).catch((e) => {});
+		return;
+	}
+
 	const mentionedGenderRole = msg.mentions.roles.first();
 
 	if (!mentionedGenderRole) {
@@ -94,6 +137,9 @@ export const handle = async (msg: Message) => {
 	const embeds: Array<MessageEmbed> = [];
 
 	for (const member of mentionedGenderRole.members.array()) {
+		// ignore author info
+		if (member.id == authorMember.id) continue;
+
 		const embed = new MessageEmbed();
 		const avatarUrl = member.user.avatarURL();
 
@@ -464,4 +510,19 @@ const getMemberInfoEmbedFields = (
 			inline: false,
 		},
 	];
+};
+
+const getGender = (member: GuildMember) => {
+	const rolesNames = reactionRoleConfig["ROLE NAMES"];
+
+	let roleName: string = "";
+	Object.keys(rolesNames).every((roleId) => {
+		if (member.roles.cache.get(roleId)) {
+			roleName = rolesNames[roleId];
+			return false;
+		}
+		return true;
+	});
+
+	return roleName;
 };
