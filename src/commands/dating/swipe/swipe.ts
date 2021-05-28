@@ -5,11 +5,16 @@ import {
 	GuildMember,
 	Message,
 	MessageEmbed,
+	MessageReaction,
+	Role,
 	TextChannel,
+	User,
 } from "discord.js";
 import {
+	clearPendingMatch,
 	getMemberInfo,
 	getPendingMatch,
+	saveMatch,
 	savePendingMatch,
 } from "../../../data";
 const Pagination = require("discord-paginationembed");
@@ -20,10 +25,9 @@ import { parseYAML } from "../../../util/parse";
 const botConfig: any = getBotConfig();
 const cmdConfig: any = parseYAML(`${__dirname}/swipe.yaml`);
 const reactionRoleConfig: any = getReactionRoleConfig();
+const genderRoleNames = reactionRoleConfig["ROLE NAMES"];
 
 export const handle = async (msg: Message) => {
-	const genderRoleNames = reactionRoleConfig["ROLE NAMES"];
-
 	const mentionedGenderRole = msg.mentions.roles.first();
 
 	if (!mentionedGenderRole) {
@@ -36,7 +40,7 @@ export const handle = async (msg: Message) => {
 			})
 			.then((m) => m.delete({ timeout: 5000 }));
 		msg.react("🛑");
-		msg.delete({ timeout: 5000 });
+		msg.delete({ timeout: 5000 }).catch((e) => {});
 		return;
 	}
 
@@ -50,7 +54,7 @@ export const handle = async (msg: Message) => {
 			})
 			.then((m) => m.delete({ timeout: 5000 }));
 		msg.react("🛑");
-		msg.delete({ timeout: 5000 });
+		msg.delete({ timeout: 5000 }).catch((e) => {});
 
 		return;
 	}
@@ -66,7 +70,7 @@ export const handle = async (msg: Message) => {
 
 	if (checkRes.isErr()) {
 		console.log(checkRes.error);
-		msg.delete({ timeout: 5000 });
+		msg.delete({ timeout: 5000 }).catch((e) => {});
 		return;
 	}
 
@@ -110,53 +114,12 @@ export const handle = async (msg: Message) => {
 
 		if (!memberInfo) continue;
 
-		embed.fields = [
-			{
-				name: "Member",
-				value: member.nickname || member.user.username,
-				inline: false,
-			},
-			{
-				name: "Gender",
-				value: genderRoleNames[mentionedGenderRole.id],
-				inline: true,
-			},
-			{
-				name: "Age",
-				value: memberInfo.age,
-				inline: true,
-			},
-			{
-				name: "Height",
-				value: memberInfo.height,
-				inline: true,
-			},
-			{
-				name: "Location",
-				value: memberInfo.location,
-				inline: true,
-			},
-			{
-				name: "Favorite Color",
-				value: memberInfo.fav_color,
-				inline: true,
-			},
-			{
-				name: "Favorite Animal",
-				value: memberInfo.fav_animal,
-				inline: true,
-			},
-			{
-				name: "What makes this person happy?",
-				value: memberInfo.happy_reason,
-				inline: true,
-			},
-			{
-				name: "ID",
-				value: member.id,
-				inline: false,
-			},
-		];
+		embed.fields = getMemberInfoEmbedFields(
+			authorMember.nickname || authorMember.user.username,
+			genderRoleNames[mentionedGenderRole.id],
+			memberInfo
+		);
+
 		embeds.push(embed);
 	}
 
@@ -168,69 +131,22 @@ export const handle = async (msg: Message) => {
 
 	const paginatedEmbed = new Pagination.Embeds()
 		.setArray(embeds)
-		.setAuthorizedUsers([msg.author.id])
+		.setAuthorizedUsers([authorMember.id])
 		.setChannel(matchChannel)
 		.setColor(0xff007f)
 		.setPageIndicator(false)
 		.setEmojisFunctionAfterNavigation(true)
 		.addFunctionEmoji("💓", (_: any, instance: any) => {
-			inviteMatch(authorMember, matchChannel, msg.client);
+			inviteMatch(authorMember, mentionedGenderRole, matchChannel, msg.client);
 		})
 		.build();
 
-	const res = await savePendingMatch(msg.author.id, matchChannel.id);
+	const res = await savePendingMatch(authorMember.id, matchChannel.id);
 
 	if (res.isErr()) {
 		console.log(res.error);
 		console.log("Failed to saved the pending match.");
 	}
-};
-
-const inviteMatch = async (
-	authorMember: GuildMember,
-	matchChannel: TextChannel,
-	client: Client
-) => {
-	const clientUser = client.user;
-	let matchId: string = "";
-
-	if (!clientUser) {
-		console.log("failed to find client user");
-		return;
-	}
-
-	const msgs = await matchChannel.messages.fetch();
-	msgs.every((msg) => {
-		if (msg.embeds.length == 0) return true;
-		if (msg.author.id != clientUser.id) return true;
-
-		for (const embed of msg.embeds) {
-			const field = embed.fields.find((f) => f.name == "ID");
-			if (!field) continue;
-			matchId = field.value;
-			return false;
-		}
-
-		return true;
-	});
-
-	// delete all bot msgs
-	const botMsgs = msgs.filter((m) => m.author.id == clientUser.id);
-	await matchChannel.bulkDelete(botMsgs);
-
-	await matchChannel.send(`<@${authorMember.id}>,`, {
-		embed: {
-			title: "Waiting for an response",
-			color: 0xff007f,
-			thumbnail: {
-				url: "https://media1.tenor.com/images/3d236166f36b07b08c115dc43bc8253f/tenor.gif",
-			},
-			description: `**I sent an invite to the person you like. Please be patient until that person responds.**`,
-			footer: {
-				text: `Please use ${botConfig.PREFIX}done command to close this private chat.`,
-			},
-		},
-	});
 };
 
 const createMatchChannel = async (guild: Guild, member: GuildMember) => {
@@ -280,4 +196,266 @@ const createMatchChannel = async (guild: Guild, member: GuildMember) => {
 	});
 
 	return datingChannel;
+};
+
+const inviteMatch = async (
+	authorMember: GuildMember,
+	genderRole: Role,
+	matchChannel: TextChannel,
+	client: Client
+) => {
+	const clientUser = client.user;
+	let matchId: string = "";
+
+	if (!clientUser) {
+		console.log("failed to find client user");
+		return;
+	}
+
+	let msgs = await matchChannel.messages.fetch();
+	let botMsgs = msgs.filter((m) => m.author.id == clientUser.id);
+
+	botMsgs.every((msg) => {
+		if (msg.embeds.length == 0) return true;
+		if (msg.author.id != clientUser.id) return true;
+
+		for (const embed of msg.embeds) {
+			const field = embed.fields.find((f) => {
+				return f.name.trim() == "ID";
+			});
+			if (!field) return true;
+			matchId = field.value;
+			return false;
+		}
+		return true;
+	});
+
+	// delete all bot msgs
+	await matchChannel.bulkDelete(botMsgs);
+
+	await matchChannel.send(`<@${authorMember.id}>,`, {
+		embed: {
+			title: "Waiting for a response",
+			color: 0xff007f,
+			thumbnail: {
+				url: "https://media1.tenor.com/images/3d236166f36b07b08c115dc43bc8253f/tenor.gif",
+			},
+			description: `**I sent an invite to the person you like. Please be patient until that person responds.**`,
+			footer: {
+				text: `Please use ${botConfig.PREFIX}done command to close this private chat.`,
+			},
+		},
+	});
+
+	const matchMember = await matchChannel.guild.members.fetch(matchId);
+
+	if (!matchMember || !matchMember.id) {
+		console.log(`ID: ${matchId} member not found.`);
+		return;
+	}
+
+	const memberInfoRes = await getMemberInfo(matchMember.user.id);
+
+	if (memberInfoRes.isErr()) {
+		console.log("Unable to get member info.");
+		console.log(memberInfoRes.error);
+		return;
+	}
+
+	const memberInfo = memberInfoRes.value;
+
+	if (!memberInfo) {
+		console.log(`Member ${matchMember.id} is not registered.`);
+		return;
+	}
+
+	// get a response from the match
+	const inviteMsg = await matchMember.send({
+		embed: {
+			color: 0xff007f,
+			description: `Member **${
+				authorMember.nickname || authorMember.user.username
+			}** would like to start a private conversation with you.\n\nMember Formation,`,
+			fields: getMemberInfoEmbedFields(
+				authorMember.nickname || authorMember.user.username,
+				genderRoleNames[genderRole.id],
+				memberInfo
+			),
+		},
+		footer: {
+			text: "Please react with 👍 to accept or 👎 to reject.",
+		},
+	});
+
+	await inviteMsg.react("👍");
+	await inviteMsg.react("👎");
+
+	const filter = (reaction: MessageReaction, user: User) => {
+		return (
+			["👍", "👎"].includes(reaction.emoji.name) &&
+			user.id === matchMember.user.id
+		);
+	};
+
+	let collected;
+
+	try {
+		collected = await inviteMsg.awaitReactions(filter, {
+			max: 1,
+			time: 60000,
+			errors: ["time"],
+		});
+	} catch (e) {
+		sendDualResponse(
+			authorMember.user,
+			matchMember.user,
+			`**${
+				matchMember.nickname || matchMember.user.username
+			}** failed to reply to your invitation.`,
+			`You failed to respond to the invitation from **${
+				authorMember.nickname || authorMember.user.username
+			}**.`
+		);
+		return;
+	}
+
+	const reaction = collected.first();
+	if (!reaction) return;
+
+	if (reaction.emoji.name == "👍") {
+		sendDualResponse(
+			authorMember.user,
+			matchMember.user,
+			`Member **${
+				matchMember.nickname || matchMember.user.username
+			}** has confirmed the private chat invitation.`,
+			`You have confirmed the private chat invitation to member **${
+				authorMember.nickname || authorMember.user.username
+			}**.`
+		);
+
+		// add the match to date channel
+		await matchChannel.createOverwrite(matchMember, { VIEW_CHANNEL: true });
+
+		msgs = await matchChannel.messages.fetch();
+		botMsgs = msgs.filter((m) => m.author.id == clientUser.id);
+		await matchChannel.bulkDelete(botMsgs);
+
+		// send msg
+		await matchChannel.send(`<@${authorMember.id}><@${matchMember.id}>,`, {
+			embed: {
+				title: "Match completed.",
+				color: 0xff007f,
+				thumbnail: {
+					url: "https://media1.tenor.com/images/3d236166f36b07b08c115dc43bc8253f/tenor.gif",
+				},
+				description: `**This is a private channel only you guys can access. Please close this chat after you are done.**`,
+				footer: {
+					text: `Please use ${botConfig.PREFIX}done command to close this private chat.`,
+				},
+			},
+		});
+
+		// save
+		const matchSaveRes = await saveMatch(
+			matchChannel.id,
+			authorMember.id,
+			matchMember.id
+		);
+
+		if (matchSaveRes.isErr()) {
+			console.log(matchSaveRes.error);
+		}
+
+		const clearPendingMatchRes = await clearPendingMatch(authorMember.id);
+
+		if (clearPendingMatchRes.isErr()) {
+			console.log(clearPendingMatchRes.error);
+		}
+	} else {
+		sendDualResponse(
+			authorMember.user,
+			matchMember.user,
+			`**${
+				matchMember.nickname || matchMember.user.username
+			}** rejected your private chat invitation.`,
+			`You have rejected the private chat invitation from **${
+				authorMember.nickname || authorMember.user.username
+			}**.`
+		);
+	}
+};
+
+const sendDualResponse = (
+	author: User,
+	match: User,
+	authorMsg: string,
+	matchMsg: string
+) => {
+	author.send({
+		embed: {
+			color: 0x2d91e7,
+			description: authorMsg,
+		},
+	});
+	match.send({
+		embed: {
+			color: 0x2d91e7,
+			description: matchMsg,
+		},
+	});
+};
+
+const getMemberInfoEmbedFields = (
+	memberName: string,
+	gender: string,
+	memberInfo: any
+) => {
+	return [
+		{
+			name: "Member",
+			value: memberName,
+			inline: false,
+		},
+		{
+			name: "Gender",
+			value: gender,
+			inline: true,
+		},
+		{
+			name: "Age",
+			value: memberInfo.age,
+			inline: true,
+		},
+		{
+			name: "Height",
+			value: memberInfo.height,
+			inline: true,
+		},
+		{
+			name: "Location",
+			value: memberInfo.location,
+			inline: true,
+		},
+		{
+			name: "Favorite Color",
+			value: memberInfo.fav_color,
+			inline: true,
+		},
+		{
+			name: "Favorite Animal",
+			value: memberInfo.fav_animal,
+			inline: true,
+		},
+		{
+			name: "What makes this person happy?",
+			value: memberInfo.happy_reason,
+			inline: true,
+		},
+		{
+			name: "ID",
+			value: memberInfo.memberId,
+			inline: false,
+		},
+	];
 };
