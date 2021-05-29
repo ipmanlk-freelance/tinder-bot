@@ -30,6 +30,8 @@ const genderRoleNames = reactionRoleConfig["ROLE NAMES"];
 export const handle = async (msg: Message) => {
 	if (!msg.member) return;
 
+	const client = msg.client;
+
 	// check author has a gender role
 	const authorGender = getGender(msg.member);
 	if (authorGender.trim() == "") {
@@ -133,61 +135,14 @@ export const handle = async (msg: Message) => {
 	if (!matchChannel) {
 		return;
 	}
-	const embeds: Array<MessageEmbed> = [];
 
-	for (const member of mentionedGenderRole.members.array()) {
-		// ignore author info
-		if (member.id == authorMember.id) continue;
-
-		const embed = new MessageEmbed();
-		const avatarUrl = member.user.avatarURL();
-
-		if (avatarUrl) {
-			embed.setImage(avatarUrl);
-		}
-		embed.setThumbnail(
-			"https://cdn.discordapp.com/attachments/847152087304241182/847154551748558848/14980362bff8218406381df35beaa368.gif"
-		);
-
-		const res = await getMemberInfo(member.id);
-
-		if (res.isErr()) continue;
-
-		const memberInfo = res.value;
-
-		if (!memberInfo) continue;
-
-		embed.fields = getMemberInfoEmbedFields(
-			member.nickname || member.user.username,
-			genderRoleNames[mentionedGenderRole.id],
-			memberInfo
-		);
-
-		embeds.push(embed);
-	}
-
-	if (embeds.length == 0) {
-		const embed = new MessageEmbed();
-		embed.setDescription("Sorry!. There are no members with this role.");
-		embeds.push(embed);
-	}
-
-	const paginatedEmbed = new Pagination.Embeds()
-		.setArray(embeds)
-		.setAuthorizedUsers([authorMember.id])
-		.setChannel(matchChannel)
-		.setColor(0xff007f)
-		.setPageIndicator(false)
-		.setEmojisFunctionAfterNavigation(true)
-		.addFunctionEmoji("💓", (_: any, instance: any) => {
-			inviteMatch(
-				authorMember,
-				getGender(authorMember),
-				matchChannel,
-				msg.client
-			);
-		})
-		.build();
+	// here
+	await buildPaginationEmbed(
+		mentionedGenderRole,
+		authorMember,
+		matchChannel,
+		client
+	);
 
 	const res = await savePendingMatch(authorMember.id, matchChannel.id);
 
@@ -529,4 +484,110 @@ const getGender = (member: GuildMember) => {
 	});
 
 	return roleName;
+};
+
+const buildPaginationEmbed = async (
+	mentionedGenderRole: Role,
+	authorMember: GuildMember,
+	matchChannel: TextChannel,
+	client: Client
+) => {
+	// delete if there are any paginated embeds in the match channel
+	let paginatedEmbedMsg: Message | undefined;
+	const matchChannelMsgs = await matchChannel.messages.fetch();
+	for (const msg of matchChannelMsgs.array()) {
+		if (msg.embeds.length == 0 || msg.author.id != client.user?.id) continue;
+		let embedString = "";
+		msg.embeds.forEach((eb) => {
+			embedString += JSON.stringify(eb.toJSON());
+		});
+
+		if (embedString.includes("14980362bff8218406381df35beaa368.gif")) {
+			paginatedEmbedMsg = msg;
+			break;
+		}
+	}
+
+	if (paginatedEmbedMsg) {
+		await paginatedEmbedMsg.delete();
+	}
+
+	const embeds: Array<MessageEmbed> = [];
+
+	for (const member of mentionedGenderRole.members.array()) {
+		// ignore author info
+		if (member.id == authorMember.id) continue;
+
+		const embed = new MessageEmbed();
+		const avatarUrl = member.user.avatarURL();
+
+		if (avatarUrl) {
+			embed.setImage(avatarUrl);
+		}
+		embed.setThumbnail(
+			"https://cdn.discordapp.com/attachments/847152087304241182/847154551748558848/14980362bff8218406381df35beaa368.gif"
+		);
+
+		const res = await getMemberInfo(member.id);
+
+		if (res.isErr()) continue;
+
+		const memberInfo = res.value;
+
+		if (!memberInfo) continue;
+
+		embed.fields = getMemberInfoEmbedFields(
+			member.nickname || member.user.username,
+			genderRoleNames[mentionedGenderRole.id],
+			memberInfo
+		);
+
+		embeds.push(embed);
+	}
+
+	if (embeds.length == 0) {
+		const embed = new MessageEmbed();
+		embed.setDescription("Sorry!. There are no members with this role.");
+		embeds.push(embed);
+	}
+
+	setTimeout(() => {
+		new Pagination.Embeds()
+			.setArray(embeds)
+			.setAuthorizedUsers([authorMember.id])
+			.setChannel(matchChannel)
+			.setColor(0xff007f)
+			.setPageIndicator(false)
+			.setEmojisFunctionAfterNavigation(true)
+			.setDeleteOnTimeout(false)
+			.setTimeout(60 * 60000)
+			.setDisabledNavigationEmojis(["delete"])
+			.addFunctionEmoji("💓", (_: any, instance: any) => {
+				inviteMatch(
+					authorMember,
+					getGender(authorMember),
+					matchChannel,
+					client
+				);
+			})
+			.on("expire", () => {
+				console.log("Embed expired. Rebuilding.");
+				buildPaginationEmbed(
+					mentionedGenderRole,
+					authorMember,
+					matchChannel,
+					client
+				);
+			})
+			.on("error", (e: any) => {
+				console.log(e);
+				buildPaginationEmbed(
+					mentionedGenderRole,
+					authorMember,
+					matchChannel,
+					client
+				);
+			})
+			.build();
+	}, 3000);
 };
