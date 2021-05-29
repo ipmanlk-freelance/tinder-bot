@@ -137,6 +137,8 @@ export const handle = async (msg: Message) => {
 		return;
 	}
 
+	deleteMsgIfPossible(msg);
+
 	// create a match channel
 	const matchChannel = await createMatchChannel(guild, authorMember);
 
