@@ -136,20 +136,19 @@ export const handle = async (msg: Message) => {
 		return;
 	}
 
-	// here
-	await buildPaginationEmbed(
-		mentionedGenderRole,
-		authorMember,
-		matchChannel,
-		client
-	);
-
 	const res = await savePendingMatch(authorMember.id, matchChannel.id);
 
 	if (res.isErr()) {
 		console.log(res.error);
 		console.log("Failed to saved the pending match.");
 	}
+
+	await buildPaginationEmbed(
+		mentionedGenderRole,
+		authorMember,
+		matchChannel,
+		client
+	);
 };
 
 const createMatchChannel = async (guild: Guild, member: GuildMember) => {
@@ -492,6 +491,13 @@ const buildPaginationEmbed = async (
 	matchChannel: TextChannel,
 	client: Client
 ) => {
+	// check if this is a pending match
+	const pendingMatchRes = await getPendingMatch(authorMember.id);
+
+	if (pendingMatchRes.isErr() || !pendingMatchRes.value) {
+		return;
+	}
+
 	// delete if there are any paginated embeds in the match channel
 	let paginatedEmbedMsg: Message | undefined;
 	const matchChannelMsgs = await matchChannel.messages.fetch();
